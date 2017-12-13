@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title> WebVGA interface </title>
+<style>
+@font-face {font-family: LessPerfectDOSVGA; src: url(lpdos.ttf)}
+body {background-color: black; color: green; margin: 0px; font: 16px LessPerfectDOSVGA}
+canvas {border: 0px; padding: 0px}
+</style>
+</head>
+<body onload="go()" onresize="newsize()">
+<p id="note">Loading...</p>
+<canvas id="vgatext" width="640" height="400" onclick="clic(event)"></canvas>
+<script>
+var can= document.getElementById("vgatext");
+var vga= can.getContext("2d");
+var msg= document.getElementById("note");
+var colorset =
+  ['black','darkblue','darkgreen','darkcyan','darkred','darkmagenta','saddlebrown','grey',
+   'dimgrey', 'blue', 'green', 'cyan', 'orangered', 'hotpink', 'yellow', 'white'];
+var vram="", charsize=16, charw=8, clock=0, colnum=[0,0];
+
+function go() { //at the beginning, execute go() every 3 sec until VRAM first loads
+vramupdate();
+if (vram=="") setTimeout(go, 3000)
+else {
+  msg.style.display= "none"; //hide top <p>
+  newsize();
+  setInterval(vramupdate, 3300); //then update VRAM every 3.3 sec
+  setInterval(screfresh, 1000); //and refresh screen every sec
+}
+}
+
+function newsize() { //resizes canvas to fit window
+var w = window.innerWidth
+  || document.documentElement.clientWidth
+  || document.body.clientWidth;
+var h = window.innerHeight
+  || document.documentElement.clientHeight
+  || document.body.clientHeight;
+if (w/h > 1.6) charw= Math.max(8, Math.floor(h/50)) //limiting factor is window height
+  else charw= Math.max(8, Math.floor(w/80)); //limiting factor is window width
+charsize= 2*charw;
+can.width= 80*charw;
+can.height= 25*charsize;
+vga.font= charsize+"px LessPerfectDOSVGA";
+vga.textBaseline= "top";
+}
+
+function vramupdate() { http_get("vram&nocache="+Math.random()*1e6) }
+
+function clic(event) {
+var rect = can.getBoundingClientRect();
+var xclic = event.clientX - rect.left;
+var yclic = event.clientY - rect.top;
+var row= Math.ceil((yclic+1)/charsize);
+var col= Math.ceil((xclic+1)/charw);
+http_get("click"+row+"_"+col+"&nocache="+Math.random()*1e6);
+}
+
+function screfresh() {
+var i, j, x, y, charcode, colbyte, ind=0;
+clock= 1-clock; //switches every sec between 0 and 1
+for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 chars
+  x= j*charw;
+  y= i*charsize;
+  charcode= vram[ind];
+  if (charcode<32) charcode+= 0x254D //add some extra chars...
+  else if ((charcode>=127)&&(charcode<=160)) charcode= extrachars[charcode-127];
+  colbyte= vram[ind+2000];
+  colnum[1]= colbyte >> 4; //background color num
+  colnum[0]= colbyte & 15; //foreground color num
+  if (colnum[0]==colnum[1])
+    if (colnum[0] > 7) colnum[clock] -= 8  //flashing char (both bg&fg)
+    else if (clock==1) colnum[0] += 8 ; //blinking foreground only
+  vga.fillStyle= colorset[colnum[1]];
+  vga.fillRect(x,y,charw,charsize);
+  vga.fillStyle= colorset[colnum[0]];
+  vga.fillText(String.fromCharCode(charcode), x, y);
+  ind++;
+}
+}
+
+function http_get(that) { //sends HTTP GET request for that
+var oReq = new XMLHttpRequest();
+oReq.open("GET", that, true);
+oReq.responseType = "arraybuffer";
+//________
+oReq.onload = function (oEvent) {
+var buf = oReq.response; // Note: not oReq.responseText
+if (buf.byteLength==4000) vram = new Uint8Array(buf);
+}; //________
+oReq.send(null);
+}
+var extrachars= [//codes substituting charcodes 127-160
+0x3C6,0x207F,0x20A7,0x2219,0x221A,
+0x221E,0x2229,0x2248,0x2261,0x2264,0x2265,0x2310,0x2320,
+0x2321,0x2500,0x2502,0x250C,0x2510,0x2514,0x2518,0x251C,
+0x2524,0x252C,0x2534,0x253C,
+0x2580,0x2584,0x2588,0x258C,0x2590,0x2591,0x2592,
+0x2593,0x25A0];
+</script>
+</body>
+</html>
+
