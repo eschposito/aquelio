@@ -21,6 +21,8 @@ COMMAND PASSWORD:<input type="password" name="COMPWD"><br><br>
 </body>
 </html>`
 
+var vmem [2][2000]byte
+
 func main() {
 	log.SetFlags(log.Lshortfile)
 
