@@ -4,7 +4,6 @@ at the Maker Faire Rome 2017. Full documentation for hardware and software will 
 published in this repository.
 Aquelio uses 4 photovoltaic panels to heat the water in an electric water heater.
 It is based on:
-- ST's NUCLEOF303RE board, programmed with ARM mbed for the low level control and
-power conversion parts;
-- Raspberry Pi 3 B for the web enabled user interface, programmed in the Go language.
+- ST's NUCLEOF303RE board, programmed with ARM mbed for the low level control part;
+- Raspberry Pi 3 B for the web enabled user interface, programmed in the Rust language.
 For now the uploaded files are only work in progress, unfinished, for the user interface part.
