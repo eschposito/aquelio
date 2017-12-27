@@ -80,14 +80,15 @@ func handleConnection(conn net.Conn) {
 				}
 			case string(buf[:7])=="POST / ":
 				st:= strings.Split(string(buf), "\r\n\r\n")
-				bodyst:= strings.Trim(st[len(st)-1])
-				Trim(s string, cutset string)
+				bodyst:= strings.Trim(st[len(st)-1], "\r\n")
+				//Trim(bodysts string, cutset string)
 				for {
-					rqline, err := r.ReadString('\n')
+					post := strings.Split(bodyst, "&")
 					if err != nil {
 						log.Println("LINEREAD ERROR! >> ", err)
 						return
 					}
+				}
 			default:
 				_, err = conn.Write([]byte("HTTP/1.1 404 NOT FOUND\r\n\r\n"))
 				return
