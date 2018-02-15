@@ -3,32 +3,42 @@
 <head>
 <title> WebVGA interface </title>
 <style>
-@font-face {font-family: LessPerfectDOSVGA; src: url(lpdos.ttf)}
-body {background-color: black; color: green; margin: 0px; font: 16px LessPerfectDOSVGA}
+@font-face {font-family: LessPerfectDOSVGAmix; src: url("font")}
+body {background-color: black; color: green; margin: 0px; font: 16px LessPerfectDOSVGAmix}
 canvas {border: 0px; padding: 0px}
 </style>
 </head>
-<body onload="go()" onresize="newsize()">
-<p id="note">Loading...</p>
+<body onload="start()" onresize="newsize()">
+<p id="note"> Password? <input type="password" id="pass"></p>
 <canvas id="vgatext" width="640" height="400" onclick="clic(event)"></canvas>
 <script>
 var can= document.getElementById("vgatext");
 var vga= can.getContext("2d");
 var msg= document.getElementById("note");
+var pw= document.getElementById("pass");
 var colorset =
   ['black','darkblue','darkgreen','darkcyan','darkred','darkmagenta','saddlebrown','grey',
    'dimgrey', 'blue', 'green', 'cyan', 'orangered', 'hotpink', 'yellow', 'white'];
-var vram="", charsize=16, charw=8, clock=0, colnum=[0,0];
+var vram=tok="", charsize=16, charw=8, clock=0, colnum=[0,0];
 
-function go() { //at the beginning, execute go() every 3 sec until VRAM first loads
+function start() { //keep executing start() every 3 secs until VRAM loads
 vramupdate();
 if (vram=="") setTimeout(go, 3000)
 else {
-  msg.style.display= "none"; //hide top <p>
   newsize();
-  setInterval(vramupdate, 3300); //then update VRAM every 3.3 sec
+  setInterval(vramupdate, 2000); //then update VRAM every 2 secs
   setInterval(screfresh, 1000); //and refresh screen every sec
 }
+}
+
+function vramupdate() {
+if (tok!="") http_get("vram_"+tok+"&"+Math.random()*1e9)
+else if (pw.value!="") { //use pw then reset it and hide it
+  http_get("vram~"+pw.value+"&"+Math.random()*1e9);
+  pw.value="";
+  msg.style.display="none";
+}
+else msg.style.display="block"; //show top <p> with pw ("")
 }
 
 function newsize() { //resizes canvas to fit window
@@ -43,11 +53,9 @@ if (w/h > 1.6) charw= Math.max(8, Math.floor(h/50)) //limiting factor is window 
 charsize= 2*charw;
 can.width= 80*charw;
 can.height= 25*charsize;
-vga.font= charsize+"px LessPerfectDOSVGA";
+vga.font= charsize+"px LessPerfectDOSVGAmix";
 vga.textBaseline= "top";
 }
-
-function vramupdate() { http_get("vram&nocache="+Math.random()*1e6) }
 
 function clic(event) {
 var rect = can.getBoundingClientRect();
@@ -55,7 +63,7 @@ var xclic = event.clientX - rect.left;
 var yclic = event.clientY - rect.top;
 var row= Math.ceil((yclic+1)/charsize);
 var col= Math.ceil((xclic+1)/charw);
-http_get("click"+row+"_"+col+"&nocache="+Math.random()*1e6);
+if(tok[0]=="c") http_get("click"+row+"_"+col+"_"+tok+"&"+Math.random()*1e9);
 }
 
 function screfresh() {
@@ -65,8 +73,7 @@ for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 cha
   x= j*charw;
   y= i*charsize;
   charcode= vram[ind];
-  if (charcode<32) charcode+= 0x254D //add some extra chars...
-  else if ((charcode>=127)&&(charcode<=160)) charcode= extrachars[charcode-127];
+  if (charcode<32) charcode+= 255 //codes 0..31 map to 255..286
   colbyte= vram[ind+2000];
   colnum[1]= colbyte >> 4; //background color num
   colnum[0]= colbyte & 15; //foreground color num
@@ -82,24 +89,23 @@ for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 cha
 }
 
 function http_get(that) { //sends HTTP GET request for that
-var oReq = new XMLHttpRequest();
+var oReq= new XMLHttpRequest();
 oReq.open("GET", that, true);
-oReq.responseType = "arraybuffer";
-//________
-oReq.onload = function (oEvent) {
-var buf = oReq.response; // Note: not oReq.responseText
-if (buf.byteLength==4000) vram = new Uint8Array(buf);
-}; //________
+oReq.responseType= "arraybuffer";
+///////////
+oReq.onload= function (oEvent) {
+var buf= oReq.response; // Note: not oReq.responseText
+if (buf.byteLength>4000) {
+  vram= new Uint8Array(buf,0,4000);
+  tok= new TextDecoder("utf-8").decode(new Uint8Array(buf,4000));
+} else if (buf.byteLength>1)
+  tok= new TextDecoder("utf-8").decode(new Uint8Array(buf))
+else tok= ""; //unsuccessful request
+}
+///////////
 oReq.send(null);
 }
-var extrachars= [//codes substituting charcodes 127-160
-0x3C6,0x207F,0x20A7,0x2219,0x221A,
-0x221E,0x2229,0x2248,0x2261,0x2264,0x2265,0x2310,0x2320,
-0x2321,0x2500,0x2502,0x250C,0x2510,0x2514,0x2518,0x251C,
-0x2524,0x252C,0x2534,0x253C,
-0x2580,0x2584,0x2588,0x258C,0x2590,0x2591,0x2592,
-0x2593,0x25A0];
+
 </script>
 </body>
 </html>
-
