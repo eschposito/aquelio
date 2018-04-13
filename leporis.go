@@ -28,8 +28,12 @@ func main() {
 	}*/
 	fmt.Println("Starting up...")
 	printchan, clickchan := webvga.Serve(30, "Funge!!!")
-	printchan <- []byte("Dfdfdf") // OK to send
+	printchan <- []byte("<3y 12f / $>ET VOILA'!") // OK to send
+	fmt.Println("...done")
 	//c:= <- printchan // not OK to receive
 	//clickchan <- [2]byte{20,255} // not OK to send
-	_ = <-clickchan // OK to receive
+	for {
+		cp := <-clickchan // receive click position coordinates
+		printchan <- []byte(fmt.Sprintf("<%dX %dY^/$>* X=%d,Y=%d", cp[1], cp[0], cp[1], cp[0]))
+	}
 }

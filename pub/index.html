@@ -57,7 +57,7 @@ var xclic = event.clientX - rect.left;
 var yclic = event.clientY - rect.top;
 var row= Math.ceil((yclic+1)/charsize);
 var col= Math.ceil((xclic+1)/charw);
-http_get("click~"+pw.value+"/"+row+"/"+col);
+http_get("click~"+pw.value+"/"+((row<10)?"0":"")+row+"/"+((col<10)?"0":"")+col);
 }
 
 function screfresh() {

@@ -7,12 +7,13 @@ import (
 	"sync/atomic"
 )
 
-var vmem [4][4000]byte   // 4 sectors: 1 is written to while 1 is displayed
-var readindex uint32 = 0 // atomic access first index of displayed vmem sector
-var curpos = 0           // current cursor position, from 0 to 2000 included
-var defcolors byte       // default background and foreground colors
-var printchan chan []byte
-var clickchan chan [2]byte
+var vmem [4][4000]byte     // 4 sectors: 1 is written to while 1 is displayed
+var readindex uint32 = 0   // atomic access first index of displayed vmem sector
+var curpos = 0             // current cursor position, from 0 to 2000 included
+var defcolors byte         // default background and foreground colors
+var printchan chan []byte  // channel used for sending print requests
+var clickchan chan [2]byte // channel for getting click coordinates
+var indy int               // start index of y (row) coord in click request path
 
 func vramHandler(w http.ResponseWriter, req *http.Request) {
 	ind := atomic.LoadUint32(&readindex)
@@ -20,7 +21,15 @@ func vramHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func clickHandler(w http.ResponseWriter, req *http.Request) {
-	//clickchan <-
+	var clicpos [2]byte
+	urlstr := req.URL.Path
+	ystr := urlstr[indy : indy+2]
+	clicpos[0] = 10*(byte(ystr[0])-byte('0')) + (byte(ystr[1]) - byte('0'))
+	xstr := urlstr[indy+3 : indy+5]
+	clicpos[1] = 10*(byte(xstr[0])-byte('0')) + (byte(xstr[1]) - byte('0'))
+	fmt.Println("urlstr>>", urlstr)
+	fmt.Println("xstr:", xstr, "ystr:", ystr, "x=", clicpos[1], "y=", clicpos[0])
+	clickchan <- clicpos
 	w.WriteHeader(200) // empty OK HTTP response
 }
 
@@ -45,6 +54,7 @@ func Serve(defcols byte, greeting string) (chan<- []byte, <-chan [2]byte) {
 		fmt.Println("File read error: ", err)
 	}
 	exepw, err := ioutil.ReadFile("exepw.txt")
+	indy = len(exepw) + 8 // start index of y (row) coord in click request
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	} // end of initialization section
@@ -52,10 +62,7 @@ func Serve(defcols byte, greeting string) (chan<- []byte, <-chan [2]byte) {
 	http.HandleFunc("/vram~"+string(exepw)+"/", vramHandler)
 	http.HandleFunc("/click~"+string(exepw)+"/", clickHandler)
 	http.Handle("/", http.FileServer(http.Dir("pub")))
-	err = http.ListenAndServeTLS(":25681", "cert.pem", "key.pem", nil)
-	if err != nil {
-		fmt.Println("ListenAndServeTLS error: ", err)
-	}
+	go http.ListenAndServeTLS(":25681", "cert.pem", "key.pem", nil)
 	go printer() // printer handles all print requests
 	return printchan, clickchan
 }
@@ -67,7 +74,7 @@ func printer() {
 		txtind := 0
 		if txtlen > 2500 {
 			continue
-		} // ignore request if too long
+		} // discard request if too long
 		// set default formatting:
 		var row = byte(curpos/80 + 1)    // row, between 1 and 26
 		var col = byte(curpos%80 + 1)    // column, between 1 and 80
@@ -159,47 +166,36 @@ func printer() {
 			txtstartpos -= scrollbychars
 			txtendpos -= scrollbychars
 			newcurpos -= scrollbychars
-			for ch := 0; ch < 2000; ch++ {
-				if ch < txtstartpos {
-					vmem[wrind][ch] = vmem[wrind][ch+scrollbychars]
-					vmem[wrind][ch+2000] = vmem[wrind][ch+2000+scrollbychars]
-				} else if ch >= txtendpos {
-					vmem[wrind][ch] = byte(' ')
-					vmem[wrind][ch+2000] = defcolors
-				}
+			for ch := 0; ch < txtstartpos; ch++ { // scroll up chars before text
+				vmem[wrind][ch] = vmem[wrind][ch+scrollbychars]
+				vmem[wrind][ch+2000] = vmem[wrind][ch+2000+scrollbychars]
+			}
+			for ch := txtendpos; ch < 2000; ch++ { // insert new whitespace after text
+				vmem[wrind][ch] = byte(' ')
+				vmem[wrind][ch+2000] = defcolors
 			}
 		}
-		for ch := txtstartpos; txtind < txtlen; txtind++ { // loops over actual text to print
-			if ch >= 2000 {
-				break
-			}
-			if ch >= 0 {
-				vmem[wrind][ch] = txt[txtind]
-				vmem[wrind][ch+2000] = txtcolors
-			}
-			ch++
+		vind := txtstartpos // vind: vmem index for write operation
+		if vind < 0 {
+			vind = 0
+			txtind -= txtstartpos
+		}
+		if txtendpos > 2000 {
+			txtendpos = 2000
+		}
+		for vind < txtendpos { // loops over actual text to print
+			vmem[wrind][vind] = txt[txtind]
+			vmem[wrind][vind+2000] = txtcolors
+			vind++
+			txtind++
 		}
 		curpos = newcurpos
-		if showchanges {
+		if showchanges { // updates readindex and makes new vmem write copy
 			atomic.StoreUint32(&readindex, writeindex)
-		} // updates readindex
+			writeindex = readindex + 1
+			vmem[writeindex&3] = vmem[readindex&3]
+		}
 	}
-}
-
-func Println(txt []byte) {
-
-}
-
-func PrintAt(row, col, bgcolr, fgcolr byte, scroll bool, txt []byte) {
-
-}
-
-func PrintlnAt(row, col, bgcolr, fgcolr byte, scroll bool, txt []byte) {
-
-}
-
-func Update() { // updates vram to show changes on screen
-	printchan <- []byte("<$>")
 }
 
 func Vram() [4000]byte { // returns a copy of the current value of vram
