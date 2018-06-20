@@ -66,8 +66,9 @@ clock= 1-clock; //switches every sec between 0 and 1
 for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 chars
   x= j*charw;
   y= i*charsize;
-  charcode= vram[ind];
-  if (charcode<32) charcode+= 255 //codes 0..31 map to 255..286
+  charcode= vram[ind]; //but codes 0..31 map to 255..286 and codes 127..159 map to 287..319:
+  if (charcode<32) charcode+= 255
+  else if ((charcode>126) && (charcode<160)) charcode+= 160;
   colbyte= vram[ind+2000];
   colnum[1]= colbyte >> 4; //background color num
   colnum[0]= colbyte & 15; //foreground color num
