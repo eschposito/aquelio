@@ -243,7 +243,7 @@ func main() {
 		}
 	}
 	ff.Close()
-	// here system clock should be updated with RTC
+	// here system clock should be updated with RTC!!!!!!!!!!!!!!!!!!!!
 	t := time.Now()
 	oldt := t
 	year, month, day := t.Date()
@@ -253,7 +253,7 @@ func main() {
 	//hswh, hgwh, dswh, dgwh, mswh, mgwh, yswh, ygwh, totswh, totgwh = gettotals(t)
 	for {
 		var togglesun, togglegrid, toggleheat bool // set to false
-		var dsunwh, dgridwh float64                // energy added in this cycle, set to 0
+		var deltasunwh, deltagridwh float64        // energy added in this cycle, set to 0
 		for i := 1; i <= 10; i++ {
 			select {
 			case cp := <-clickchan: // receive click position coordinates y,x
@@ -326,19 +326,20 @@ func main() {
 			msgstr = rec[13:]
 			if string(msgstr) != "OK!" {
 				// "OK!" is the usual value for msgstr
+				fmt.Println("Nucleo not OK")
 			}
 			oldt = t
 			t = time.Now()            // looks up time after every serial read operation
 			dt := t.Sub(oldt).Hours() // time interval (h) since last calculation
 			if pvheating {
 				sunwatt = vpv * vpv / Rpv
-				dsunwh = sunwatt * dt
+				deltasunwh = sunwatt * dt
 			} else {
 				sunwatt = 0
 			}
 			if gridheating {
 				gridwatt = vgrid * vgrid / Rgrid
-				dgridwh = gridwatt * dt
+				deltagridwh = gridwatt * dt
 			} else {
 				gridwatt = 0
 			}
@@ -412,16 +413,16 @@ func main() {
 			}
 		}*/
 		// increase sun and grid energy counters:
-		hswh += dsunwh
-		dswh += dsunwh
-		mswh += dsunwh
-		yswh += dsunwh
-		totswh += dsunwh
-		hgwh += dgridwh
-		dgwh += dgridwh
-		mgwh += dgridwh
-		ygwh += dgridwh
-		totgwh += dgridwh
+		hswh += deltasunwh
+		dswh += deltasunwh
+		mswh += deltasunwh
+		yswh += deltasunwh
+		totswh += deltasunwh
+		hgwh += deltagridwh
+		dgwh += deltagridwh
+		mgwh += deltagridwh
+		ygwh += deltagridwh
+		totgwh += deltagridwh
 		// print data to screen:
 		if heatnow != oldheatnow { // turn on/off [+Temp] backlighting
 			if heatnow {
