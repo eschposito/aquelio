@@ -141,8 +141,8 @@ int main()
         }
         if (k1on) {
             lastk1on= count;
-            gridcur= vgrid/Rgrid;
-            gridpow= vgrid*gridcur;
+            gridcur= vgrid2/Rgrid;
+            gridpow= vgrid2*gridcur;
             gridstate= 'G'; // in this moment, grid is heating
         } else {
             gridcur= 0;
@@ -253,7 +253,7 @@ int main()
         // compute date and time:
         ct= localtime(&unixsecs); // write RTC time & date into ct*
         // compose string to_send:
-        snprintf(to_send, 26, "%02d%x%02d%02d%02d%c%04.0f%c%04.0f%c%02.0f%s@", // '@' last char
+        snprintf(to_send, 26, "%2d%1x%2d%2d%2d%c%4.0f%c%4.0f%c%2.0f%s@", // '@' last char
                 ct->tm_year%100, ct->tm_mon+1, ct->tm_mday, ct->tm_hour, ct->tm_min,
                 pvstate, 10*vpv, gridstate, 10*vgrid2, parambyte, wtemp, stmsg);
         // and send serial data to Raspberry:
@@ -267,7 +267,7 @@ int main()
                 "K^123i=%d%d%d%d%d A123=%d%d%d vLsw=%.1f vNsw=%.1f vPE=%.1f P%d R%d $%s",
                 kx_hi.read(), k1on.read(), k2on.read(), k3on.read(), igbt_on.read(),
                 aux1on.read(), aux2on.read(), aux3on.read(), vLswitch, vNswitch, vpe,
-                to_send[10], received, to_send);
+                parambyte, received, to_send);
             ser1.puts(line);
         } else ser1.puts(to_send);
         // next, handle local debug mode, if required:
@@ -281,7 +281,7 @@ int main()
             pc.printf("K^123i=%d%d%d%d%d A123=%d%d%d vLsw=%.1f vNsw=%.1f vPE=%.1f P%d R%d $%s\r\n",
                 kx_hi.read(), k1on.read(), k2on.read(), k3on.read(), igbt_on.read(),
                 aux1on.read(), aux2on.read(), aux3on.read(), vLswitch, vNswitch, vpe,
-                to_send[10], received, to_send);
+                parambyte, received, to_send);
         } else if (butpresscount >= 3) debugtime= 150; // button pressed for at least 3 cycles
         // finally set the state of the actuators (relays):
         if (usepv) {
