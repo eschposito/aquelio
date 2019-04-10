@@ -30,36 +30,25 @@ void turnPVon() // PV turn on sequence
 {
     kx_hi= 1;
     wait(0.5);
-    k3on= 1;
-    wait(1);
-    igbt_on= 1;
-    wait(1);
     k2on= 1;
-    wait(1);
-    igbt_on= 0;
-    kx_hi= 0;
-    wait(1);
-    k3on= 0;
     wait(0.5);
+    kx_hi= 0;
     myled= 1;
 }
 
-void turnPVoff() // PV turn off sequence
+void turnPVoff(bool nogrid) // PV turn off sequence
 {
-    kx_hi= 1;
-    wait(0.5);
-    k3on= 1;
-    wait(1);
-    igbt_on= 1;
-    wait(1);
-    k2on= 0;
-    wait(1);
-    igbt_on= 0;
-    kx_hi= 0;
-    wait(1);
-    k3on= 0;
-    wait(0.5);
-    myled= 0; 
+    if (nogrid) { // abruptly turn off relay K2
+        k2on= 0;
+        myled= 0; 
+    } else { // turn off sequence to avoid electric arc in relay K2
+        igbt_on= 1; // short circuits PV+ and PV-
+        wait(0.3);  // let the PV voltage drop
+        k2on= 0;
+        wait(0.3);  // let the relay K2 open
+        igbt_on= 0; // remove short circuit
+        myled= 0;
+    }
 }
 
 int main()
@@ -287,13 +276,14 @@ int main()
         if (usepv) {
             if (k2on) {
                 if (((wtemp >= 77) && (oldwtemp >= 77) && (veryoldwtemp >= 77))
-                    || (lowvpvcount > 5) || visolerr || thswitcherr)
-                    turnPVoff();
-                    // vgriderr no problem for PV, ntctemperr included in wtemp check
-            } else if ((wtemp<74) && (oldwtemp<74) && (veryoldwtemp<74)
+                    || (lowvpvcount > 5) || visolerr || thswitcherr
+                    || ((vgrid2 < 150) && (vpv < 48)))
+                    turnPVoff(vgrid2<150);
+                    // ntctemperr included in wtemp check
+            } else if ((wtemp<74) && (oldwtemp<74) && (veryoldwtemp<74) && (vgrid2>175)
                 && (count-lastk2on > 100) && (vpv>115) && (vpe<5) && (vNswitch>4))
                 turnPVon();
-        } else if (k2on) turnPVoff();
+        } else if (k2on) turnPVoff(vgrid2<150);
         if (usegrid) {
             if (k1on) {
                 if (((wtemp >= gridtemp) && (oldwtemp >= gridtemp) && (veryoldwtemp >= gridtemp))
