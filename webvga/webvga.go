@@ -5,8 +5,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"sync/atomic"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 4096,
+}
 var vmem [4][4000]byte     // 4 sectors: 1 is written to while 1 is displayed
 var readindex uint32       // atomic access first index of displayed vmem sector
 var curpos = 0             // current cursor position, from 0 to 2000 included
@@ -16,8 +23,25 @@ var clickchan chan [2]byte // channel for getting click coordinates
 var indy int               // start index of y (row) coord in click request path
 
 func vramHandler(w http.ResponseWriter, req *http.Request) {
-	ind := atomic.LoadUint32(&readindex)
-	w.Write(vmem[ind&3][0:4000]) // sends data of sector to be displayed
+	conn, _ := upgrader.Upgrade(w, req, nil) // error ignored for sake of simplicity
+	for {
+		// Read message from browser
+		//msgType, msg, err := conn.ReadMessage()
+		/*if err != nil {
+			return
+		}
+
+		// Print the message to the console
+		fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))*/
+
+		// Write VRAM data to browser
+		ind := atomic.LoadUint32(&readindex)
+		err := conn.WriteMessage(websocket.BinaryMessage, vmem[ind&3][0:4000]) // sends data to be displayed
+		if err != nil {
+			return
+		}
+		time.Sleep(2 * time.Second)
+	}
 }
 
 func clickHandler(w http.ResponseWriter, req *http.Request) {
@@ -29,6 +53,8 @@ func clickHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(200) // empty OK HTTP response
 }
 
+// Serve serves webvga using defcols (default colors) and first shows greeting[] on screen;
+// it launches ListenAndServeTLS() and printer() goroutines, then returns in and out channels
 func Serve(defcols byte, greeting []byte) (chan<- []byte, <-chan [2]byte) {
 	defcolors = defcols                // initialization section
 	printchan = make(chan []byte, 10)  // remembers up to 10 print calls
@@ -204,7 +230,8 @@ func printer() {
 	}
 }
 
-func Vram() [4000]byte { // returns a copy of the current value of vram
+// Vram returns a copy of the current value of vram
+func Vram() [4000]byte {
 	ind := atomic.LoadUint32(&readindex)
 	return vmem[ind&3]
 }

@@ -8,8 +8,8 @@ body {background-color: black; color: green; margin: 0px; font: 16px LessPerfect
 canvas {border: 0px; padding: 0px}
 </style>
 </head>
-<body onload="go()" onresize="newsize()">
-<p id="note">Password?<input type="password" id="pass" value="" onchange="hidepw()"></p>
+<body onresize="newsize()">
+<p id="note">Password?<input type="password" id="pass" value="" onchange="go()"></p>
 <canvas id="vgatext" width="640" height="400" onclick="clic(event)"></canvas>
 <script>
 var can= document.getElementById("vgatext");
@@ -21,19 +21,30 @@ var colorset =
    'dimgrey', 'blue', 'green', 'cyan', 'orangered', 'hotpink', 'yellow', 'white'];
 var vram="", charsize=16, charw=8, clock=0, colnum=[0,0];
 
-function go() { //keep executing go() every 3 secs until VRAM loads
-if (pw.value!="") vramupdate();
+function go() {
+var ur= "wss" + location.href.substring(5) + "vram~"+pw.value+"/"+Math.random()*1e9;
+alert(ur);
+var sock= new WebSocket(ur);
+sock.binaryType= "arraybuffer";
+sock.onmessage= function(ev) {
+  var buf= ev.data;
+  if (buf.byteLength==4000) vram= new Uint8Array(buf);
+}
+msg.style.display="none"; // hide top <p>
+newsize();
+setInterval(screfresh, 1000); // refresh screen every sec
+/*if (pw.value!="") vramupdate();
 if (vram=="") setTimeout(go, 3000)
 else {
   newsize();
   setInterval(vramupdate, 2000); //then update VRAM every 2 secs
   setInterval(screfresh, 1000); //and refresh screen every sec
-}
+}*/
 }
 
-function hidepw() { msg.style.display="none" } //hide top <p>
+//function hidepw() { msg.style.display="none" } //hide top <p>
 
-function vramupdate() { http_get("vram~"+pw.value) }
+//function vramupdate() { http_get("vram~"+pw.value) }
 
 function newsize() { //resizes canvas to fit window
 var w = window.innerWidth
@@ -86,12 +97,12 @@ for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 cha
 function http_get(that) { //sends HTTP GET request for that
 var oReq= new XMLHttpRequest();
 oReq.open("GET", that+"/"+Math.random()*1e9, true); //adds random salt
-oReq.responseType= "arraybuffer";
+//oReq.responseType= "arraybuffer";
 ///////////
-oReq.onload= function (oEvent) {
+/*oReq.onload= function (oEvent) {
 var buf= oReq.response; // Note: not oReq.responseText
 if (buf.byteLength==4000) vram= new Uint8Array(buf);
-}
+}*/
 ///////////
 oReq.send(null);
 }
