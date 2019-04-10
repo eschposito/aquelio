@@ -97,24 +97,24 @@ func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool) {
 	pchan <- append([]byte("<25y 1x 0b 10f>"), 202)
 	pchan <- append([]byte("<0b 9f> "), 200)
 	pchan <- append([]byte("<0b 9f>Aquelio"), 200)
-	pchan <- []byte("<0b 10f> State:         ")
+	pchan <- []byte("<0b 10f> Status:        ")
 	pchan <- append([]byte("<0b 4f>"), 31)         // 31: down pointing triangle
 	pchan <- append([]byte("<0b 10f>y-m-d@h"), 30) // 30: up pointing triangle
 	pchan <- append([]byte("<0b 4f> "), 31)
 	pchan <- append([]byte("<0b 10f>*Sun"), 30)
 	pchan <- append([]byte("<0b 4f> "), 31)
 	pchan <- append([]byte("<0b 10f>~Grid"), 30)
-	pchan <- append([]byte("<74y 0b 4f>"), 31)
+	pchan <- append([]byte("<74x 0b 4f>"), 31)
 	pchan <- append([]byte("<0b 10f>+Temp"), 30)
 	if usepv {
-		pchan <- []byte("<25y 33x 14b 10f>*Sun") // [*Sun] backlighting on
+		pchan <- []byte("<25y 39x 14b 10f>*Sun") // [*Sun] backlighting on
 	} else {
-		pchan <- []byte("<25y 33x 0b 14f>*Sun") // [*Sun] backlighting off
+		pchan <- []byte("<25y 39x 0b 14f>*Sun") // [*Sun] backlighting off
 	}
 	if usegrid {
-		pchan <- []byte("<25y 38x 7b 10f>~Grid") // [~Grid] backlighting on
+		pchan <- []byte("<25y 46x 7b 10f>~Grid") // [~Grid] backlighting on
 	} else {
-		pchan <- []byte("<25y 38x 0b 7f>~Grid") // [~Grid] backlighting off
+		pchan <- []byte("<25y 46x 0b 7f>~Grid") // [~Grid] backlighting off
 	}
 	if heatnow {
 		pchan <- []byte("<25y 75x 12b 10f>+Temp") // [+Temp] backlighting on
@@ -240,7 +240,7 @@ func main() {
 	heatnow := false // true if manual heating [+°C] was requested
 	printscreen(printchan, usepv, usegrid, heatnow)
 	fmt.Println("...done")
-	buf := make([]byte, 400)         // buffer of chars read from Nucleo
+	buf := make([]byte, 320)         // buffer of chars read from Nucleo
 	const startyear = 2018           // means startyear <= yyyy <= startyear+99
 	const Rpv = 9.6                  // ohm rating of PV heater resistor
 	const Rgrid = 35.5               // ohm rating of grid heater resistor
@@ -307,16 +307,16 @@ func main() {
 					case 36: // time up icon
 					case 38: // *Sun stop icon
 						usepv = false
-						printchan <- []byte("<25y 33x 0b 14f>*Sun") // [*Sun] backlighting off
+						printchan <- []byte("<25y 39x 0b 14f>*Sun") // [*Sun] backlighting off
 					case 43: // *Sun start icon
 						usepv = true
-						printchan <- []byte("<25y 33x 14b 10f>*Sun") // [*Sun] backlighting on
+						printchan <- []byte("<25y 39x 14b 10f>*Sun") // [*Sun] backlighting on
 					case 45: // ~Grid stop icon
 						usegrid = false
-						printchan <- []byte("<25y 38x 0b 7f>~Grid") // [~Grid] backlighting off
+						printchan <- []byte("<25y 46x 0b 7f>~Grid") // [~Grid] backlighting off
 					case 51: // ~Grid start icon
 						usegrid = true
-						printchan <- []byte("<25y 38x 7b 10f>~Grid") // [~Grid] backlighting on
+						printchan <- []byte("<25y 46x 7b 10f>~Grid") // [~Grid] backlighting on
 					case 74: // +Temp stop icon
 						heatnow = false
 						printchan <- []byte("<25y 75x 0b 12f>+Temp") // [+Temp] backlighting off
@@ -351,8 +351,7 @@ func main() {
 		dt := t.Sub(oldt).Hours() // time interval (h) since last calculation
 		if getmoreinfo {          // displays buffer contents on screen
 			printchan <- []byte("<21y 1x>")
-			printchan <- buf[:]
-			printchan <- []byte("                                               ")
+			printchan <- buf[:bytesread]
 		}
 		if (bytesread < 25) || (ch != '@') {
 			continue // couldn't read from Nucleo, skip to next loop iteration
@@ -398,6 +397,18 @@ func main() {
 		if err != nil {
 			temp = 99
 		}
+		if getmoreinfo {
+			printchan <- []byte("<1y 30x>")
+			printchan <- []byte(string(rec[1:5]))
+			printchan <- []byte(fmt.Sprintf("<1y 40x>%4.0f V; parambyte= %d", vpv, rec[10]))
+			printchan <- []byte("<2y 30x>")
+			printchan <- []byte(string(rec[11:13]))
+			printchan <- []byte(fmt.Sprintf("<2y 40x>%d degC", temp))
+			printchan <- []byte("<3y 30x>")
+			printchan <- []byte(string(rec[6:10]))
+			printchan <- []byte(fmt.Sprintf("<3y 40x>%4.0f Vca", vgrid))
+		}
+
 		msgstr = rec[13:]
 		if string(msgstr) != "OK@" {
 			// "OK@" is the usual value for msgstr
