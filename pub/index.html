@@ -19,32 +19,22 @@ var pw= document.getElementById("pass");
 var colorset =
   ['black','darkblue','darkgreen','darkcyan','darkred','darkmagenta','saddlebrown','grey',
    'dimgrey', 'blue', 'green', 'cyan', 'orangered', 'hotpink', 'yellow', 'white'];
-var vram="", charsize=16, charw=8, clock=0, colnum=[0,0];
+var vram="", charsize=16, charw=8, clock=0, colnum=[0,0], sock;
 
 function go() {
 var ur= "wss" + location.href.substring(5) + "vram~"+pw.value+"/"+Math.random()*1e9;
-alert(ur);
-var sock= new WebSocket(ur);
+//alert(ur); //uncomment this line if you want to see websocket url in alert
+sock= new WebSocket(ur);
 sock.binaryType= "arraybuffer";
 sock.onmessage= function(ev) {
   var buf= ev.data;
   if (buf.byteLength==4000) vram= new Uint8Array(buf);
 }
 msg.style.display="none"; // hide top <p>
+pw.value= "" // reset password
 newsize();
 setInterval(screfresh, 1000); // refresh screen every sec
-/*if (pw.value!="") vramupdate();
-if (vram=="") setTimeout(go, 3000)
-else {
-  newsize();
-  setInterval(vramupdate, 2000); //then update VRAM every 2 secs
-  setInterval(screfresh, 1000); //and refresh screen every sec
-}*/
 }
-
-//function hidepw() { msg.style.display="none" } //hide top <p>
-
-//function vramupdate() { http_get("vram~"+pw.value) }
 
 function newsize() { //resizes canvas to fit window
 var w = window.innerWidth
@@ -62,13 +52,14 @@ vga.font= charsize+"px LessPerfectDOSVGAmix";
 vga.textBaseline= "top";
 }
 
-function clic(event) {
+function clic(event) { // processes and sends click coordinates through wss
 var rect = can.getBoundingClientRect();
 var xclic = event.clientX - rect.left;
 var yclic = event.clientY - rect.top;
-var row= Math.ceil((yclic+1)/charsize);
-var col= Math.ceil((xclic+1)/charw);
-http_get("click~"+pw.value+"/"+((row<10)?"0":"")+row+"/"+((col<10)?"0":"")+col);
+var coords = new Uint8Array(2);
+coords[0]= Math.ceil((yclic+1)/charsize); // row index
+coords[1]= Math.ceil((xclic+1)/charw); // column index
+sock.send(coords);
 }
 
 function screfresh() {
@@ -92,19 +83,6 @@ for (i=0; i<25; i++) for (j=0; j<80; j++) { //cycle thru and print all 80x25 cha
   vga.fillText(String.fromCharCode(charcode), x, y);
   ind++;
 }
-}
-
-function http_get(that) { //sends HTTP GET request for that
-var oReq= new XMLHttpRequest();
-oReq.open("GET", that+"/"+Math.random()*1e9, true); //adds random salt
-//oReq.responseType= "arraybuffer";
-///////////
-/*oReq.onload= function (oEvent) {
-var buf= oReq.response; // Note: not oReq.responseText
-if (buf.byteLength==4000) vram= new Uint8Array(buf);
-}*/
-///////////
-oReq.send(null);
 }
 
 </script>

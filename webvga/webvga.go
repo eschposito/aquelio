@@ -11,7 +11,7 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
+	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
 }
 var vmem [4][4000]byte     // 4 sectors: 1 is written to while 1 is displayed
@@ -20,38 +20,6 @@ var curpos = 0             // current cursor position, from 0 to 2000 included
 var defcolors byte         // default background and foreground colors
 var printchan chan []byte  // channel used for sending print requests
 var clickchan chan [2]byte // channel for getting click coordinates
-var indy int               // start index of y (row) coord in click request path
-
-func vramHandler(w http.ResponseWriter, req *http.Request) {
-	conn, _ := upgrader.Upgrade(w, req, nil) // error ignored for sake of simplicity
-	for {
-		// Read message from browser
-		//msgType, msg, err := conn.ReadMessage()
-		/*if err != nil {
-			return
-		}
-
-		// Print the message to the console
-		fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))*/
-
-		// Write VRAM data to browser
-		ind := atomic.LoadUint32(&readindex)
-		err := conn.WriteMessage(websocket.BinaryMessage, vmem[ind&3][0:4000]) // sends data to be displayed
-		if err != nil {
-			return
-		}
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func clickHandler(w http.ResponseWriter, req *http.Request) {
-	pstr := req.URL.Path[indy : indy+5]                                     // path string slice containing click coords
-	var clicpos [2]byte                                                     // row,column click coordinates
-	clicpos[0] = 10*(byte(pstr[0])-byte('0')) + (byte(pstr[1]) - byte('0')) // Y (row)
-	clicpos[1] = 10*(byte(pstr[3])-byte('0')) + (byte(pstr[4]) - byte('0')) // X (col)
-	clickchan <- clicpos
-	w.WriteHeader(200) // empty OK HTTP response
-}
 
 // Serve serves webvga using defcols (default colors) and first shows greeting[] on screen;
 // it launches ListenAndServeTLS() and printer() goroutines, then returns in and out channels
@@ -76,13 +44,11 @@ func Serve(defcols byte, greeting []byte) (chan<- []byte, <-chan [2]byte) {
 		fmt.Println("File read error: ", err)
 	}
 	exepw, err := ioutil.ReadFile("exepw.txt")
-	indy = len(exepw) + 8 // start index of y (row) coord in click request
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	} // end of initialization section
-	http.HandleFunc("/vram~"+string(axspw)+"/", vramHandler)
-	http.HandleFunc("/vram~"+string(exepw)+"/", vramHandler)
-	http.HandleFunc("/click~"+string(exepw)+"/", clickHandler)
+	http.HandleFunc("/vram~"+string(axspw)+"/", vramHandler)   // can see screen but ignores clicks
+	http.HandleFunc("/vram~"+string(exepw)+"/", vramHandlerRW) // can see screen and process clicks
 	http.Handle("/priv_"+string(axspw)+"/", http.FileServer(http.Dir("priv")))
 	http.Handle("/priv_"+string(exepw)+"/", http.FileServer(http.Dir("priv")))
 	http.Handle("/verypriv_"+string(exepw)+"/", http.FileServer(http.Dir("verypriv")))
@@ -90,6 +56,48 @@ func Serve(defcols byte, greeting []byte) (chan<- []byte, <-chan [2]byte) {
 	go http.ListenAndServeTLS(":25681", "cert.pem", "key.pem", nil)
 	go printer() // printer handles all print requests
 	return printchan, clickchan
+}
+
+func vramHandler(w http.ResponseWriter, req *http.Request) {
+	sock, _ := upgrader.Upgrade(w, req, nil) // error ignored for sake of simplicity
+	for {                                    // Write VRAM data to browser
+		ind := atomic.LoadUint32(&readindex)
+		err := sock.WriteMessage(websocket.BinaryMessage, vmem[ind&3][0:4000]) // sends data to be displayed
+		if err != nil {
+			fmt.Println("Websocket write error: ", err)
+			return
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func vramHandlerRW(w http.ResponseWriter, req *http.Request) {
+	sock, _ := upgrader.Upgrade(w, req, nil)
+	go processClicks(sock) // separate goroutine for receiving and processing clicks
+	for {                  // Write VRAM data to browser
+		ind := atomic.LoadUint32(&readindex)
+		err := sock.WriteMessage(websocket.BinaryMessage, vmem[ind&3][0:4000]) // sends data to be displayed
+		if err != nil {
+			fmt.Println("Websocket write error: ", err)
+			return
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func processClicks(sock *websocket.Conn) {
+	var clicpos [2]byte
+	for {
+		sock.SetReadDeadline(time.Now().Add(5 * time.Minute)) // returns if no clicks for 5 mins
+		_, message, err := sock.ReadMessage()
+		if err != nil {
+			fmt.Println("Websocket read error: ", err)
+			return
+		}
+		clicpos[0] = message[0]
+		clicpos[1] = message[1]
+		clickchan <- clicpos
+	}
 }
 
 func printer() {
