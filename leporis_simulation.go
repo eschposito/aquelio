@@ -1,4 +1,5 @@
 package main
+
 //$ : lines removed in the simulation version
 import (
 	"bufio"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"./webvga"
-
 	//$ "github.com/tarm/serial"
 )
 
@@ -227,6 +227,75 @@ func newscreen(printchan chan<- []byte, hour, day, month, year int) {
 	}
 }
 
+///////////////////$ GLOBALS:
+var keyboardchan = make(chan []byte, 10)
+var rtc = []byte("yymddhhmm")
+var rec = []byte("s0000g0000P99OK@")
+
+func yesMaam() { // gets user keyboard input and sends it to yesSer
+	reader := bufio.NewReader(os.Stdin)
+	for { // keeps running until user quits
+		text, _ := reader.ReadString('\n')
+		inp := []byte(text)
+		switch inp[0] {
+		case 'S', 's', 'G', 'g', 'T', 't', 'P', 'p':
+			keyboardchan <- inp
+		case 'Q', 'q': // quit and close all
+			keyboardchan <- []byte("quit")
+			return
+		}
+	}
+}
+
+func yesSer() bool { // simulates serial string from Nucleo
+	// 1) update rtc:
+	t := time.Now()
+	year, month, day := t.Date()
+	hour, minute, _ := t.Clock()
+	rtc[1] = byte(year%10 + 48)
+	decade := year / 10
+	rtc[0] = byte(decade%10 + 48)
+	if month < 10 {
+		rtc[2] = byte(month) + 48 // '1'...'9'
+	} else {
+		rtc[2] = byte(month) + 55 // 'A'...'F'
+	}
+	rtc[4] = byte(day%10 + 48)
+	daydec := day / 10
+	rtc[3] = byte(daydec%10 + 48)
+	rtc[6] = byte(hour%10 + 48)
+	hourdec := hour / 10
+	rtc[5] = byte(hourdec%10 + 48)
+	rtc[8] = byte(minute%10 + 48)
+	mindec := minute / 10
+	rtc[7] = byte(mindec%10 + 48)
+	// 2) update rec:
+	select {
+	case keybd := <-keyboardchan: // get user keyboard input
+		switch keybd[0] {
+		case 'S', 's': // change sun data (eg 'S1100')
+			for i := 0; i < 5; i++ {
+				rec[i] = keybd[i]
+			}
+		case 'G', 'g': // change grid data (eg 'g2300')
+			for i := 0; i < 5; i++ {
+				rec[i+5] = keybd[i]
+			}
+		case 'P', 'p': // change parambyte (eg 'p080')
+			rec[10] = 100*(keybd[1]-48) + 10*(keybd[2]-48) + keybd[3] - 48
+		case 'T', 't': // temperature (eg 'T48')
+			for i := 0; i < 2; i++ {
+				rec[i+11] = keybd[i+1]
+			}
+		case 'q':
+			return false // close all and quit
+		}
+	default: // use old value of rec if channel is empty
+	}
+	time.Sleep(2 * time.Second)
+	return true
+}
+
 func main() {
 	fmt.Println("Starting up...")
 	printchan, clickchan := webvga.Serve(30, []byte("Loading..."))
@@ -234,7 +303,7 @@ func main() {
 	ser, err := serial.OpenPort(com)
 	if err != nil {
 		fmt.Println("Serial opening error:", err)
-	} *///$
+	} */             //$
 	usepv := true    // enable use of PV
 	usegrid := true  // enable use of grid
 	heatnow := false // true if manual heating [+°C] was requested
@@ -284,7 +353,8 @@ func main() {
 	//fmt.Println(year, month, day, hour, minute)
 	//newscreen(printchan, hour, day, int(month), year) // print lines 1..24
 	//hswh, hgwh, dswh, dgwh, mswh, mgwh, yswh, ygwh, totswh, totgwh = gettotals(t)
-	for { // infinite loop
+	go yesMaam()
+	for { // infinite loop (unless user quits)
 		var xclick, yclick byte             // click coords
 		var deltasunwh, deltagridwh float64 // energy added in this cycle, set to 0
 		for i := 1; i <= 10; i++ {
@@ -336,7 +406,7 @@ func main() {
 		} // nonsense, to be removed!!!!
 		bytesread := 0
 		ch := byte('$') // ch will be the last char read, hopefully '@'
-		for (bytesread < 25) || ((ch != '@') && (bytesread < 200)) {
+		/*$ for (bytesread < 25) || ((ch != '@') && (bytesread < 200)) {
 			n, _ := ser.Read(buf[bytesread:])
 			if n > 0 {
 				bytesread += n        // update read char count
@@ -345,7 +415,12 @@ func main() {
 				fmt.Println("Serial read timeout!")
 				break
 			}
-		}
+		} $*/bytesread = 25
+		ch = '@'
+		if !yesSer() { // end main loop and quit
+			return
+		} /////$
+
 		oldt = t
 		t = time.Now()            // looks up time after every serial read operation
 		dt := t.Sub(oldt).Hours() // time interval (h) since last calculation
@@ -358,8 +433,8 @@ func main() {
 		} //////////// else, go on:
 		var deciV int
 		err = nil
-		rec := buf[bytesread-16 : bytesread]    // get last 16 char
-		rtc := buf[bytesread-25 : bytesread-16] // date & time info
+		//$ rec := buf[bytesread-16 : bytesread]    // get last 16 char
+		//$ rtc := buf[bytesread-25 : bytesread-16] // date & time info
 		switch rec[0] {
 		case byte('s'):
 			pvheating = false
@@ -463,7 +538,7 @@ func main() {
 		if (serbyte == 200) && getmoreinfo {
 			serbyte = 4 // tell Nucleo to send complete data
 		}
-		ser.Write([]byte{serbyte})
+		//$ ser.Write([]byte{serbyte})
 		/*if hh != hour { // hh is the latest reading, hour is the preceding one
 			// first append line to datafile with last hour's data:
 			ln := fmt.Sprintf("%d %2d %d %d/n", hour+100*day+1e4*int(month)+1e6*year, oldtemp, int(totswh), int(totgwh))
