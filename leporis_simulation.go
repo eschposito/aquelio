@@ -310,7 +310,7 @@ func main() {
 	printscreen(printchan, usepv, usegrid, heatnow)
 	fmt.Println("...done")
 	buf := make([]byte, 320)         // buffer of chars read from Nucleo
-	const startyear = 2018           // means startyear <= yyyy <= startyear+99
+	const startyear = 2020           // means startyear <= yyyy <= startyear+99
 	const Rpv = 9.6                  // ohm rating of PV heater resistor
 	const Rgrid = 35.5               // ohm rating of grid heater resistor
 	var vpv, vgrid float64           // PV and grid voltage readings from Nucleo
