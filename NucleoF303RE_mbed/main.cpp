@@ -221,14 +221,10 @@ int main()
                 unixsecs+= 60;
                 set_time(unixsecs);
                 break;
-            case 80: // set RTC time seconds back to 00
+            case 80: // set RTC time to nearest 00 seconds
                 ct= localtime(&unixsecs); // put actual date & time into tm struct pointed by ct
-                unixsecs-= ct->tm_sec;
-                set_time(unixsecs);
-                break;
-            case 81: // set RTC time seconds forward to 00
-                ct= localtime(&unixsecs); // put actual date & time into tm struct pointed by ct
-                unixsecs+= 60 - ct->tm_sec;
+                if (ct->tm_sec < 30) unixsecs-= ct->tm_sec;
+                else unixsecs+= 60 - ct->tm_sec;
                 set_time(unixsecs);
                 break;
             default:

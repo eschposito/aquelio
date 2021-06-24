@@ -231,6 +231,7 @@ func newscreen(printchan chan<- []byte, hour, day, month, year int) {
 var keyboardchan = make(chan []byte, 10)
 var rtc = []byte("yymddhhmm")
 var rec = []byte("s0000g0000P99OK@")
+var mustanswer = false
 
 func yesMaam() { // gets user keyboard input and sends it to yesSer
 	reader := bufio.NewReader(os.Stdin)
@@ -277,16 +278,20 @@ func yesSer() bool { // simulates serial string from Nucleo
 			for i := 0; i < 5; i++ {
 				rec[i] = keybd[i]
 			}
+			mustanswer = true
 		case 'G', 'g': // change grid data (eg 'g2300')
 			for i := 0; i < 5; i++ {
 				rec[i+5] = keybd[i]
 			}
+			mustanswer = true
 		case 'P', 'p': // change parambyte (eg 'p080')
 			rec[10] = 100*(keybd[1]-48) + 10*(keybd[2]-48) + keybd[3] - 48
+			mustanswer = true
 		case 'T', 't': // temperature (eg 'T48')
 			for i := 0; i < 2; i++ {
 				rec[i+11] = keybd[i+1]
 			}
+			mustanswer = true
 		case 'q':
 			return false // close all and quit
 		}
@@ -327,7 +332,7 @@ func main() {
 	var stgridtemp byte              // set temp (5..67°C) for grid heating and Nucleo setting
 	var getmoreinfo bool             // if true, reads and displays more info from Nucleo
 	var msgstr []byte                // 3 char status/message from Nucleo
-	var gridtemp [24]byte            // hourly table of grid temp settings (5..67°C), now initialize them:
+	var gridtemp [7][24]byte         // hourly table of grid temp settings (5..67°C), now initialize them:
 	ff, err := os.Open("priv/gridtempsettings.txt")
 	ffScanner := bufio.NewScanner(ff)
 	if err != nil {
@@ -335,13 +340,16 @@ func main() {
 		return
 	}
 	ffScanner.Scan() // read and discard first line
-	ffScanner.Scan() // second line contains grid temp settings data
-	for i := 0; i < 24; i++ {
-		fmt.Sscan(ffScanner.Text(), &gridtemp[i])
-		if gridtemp[i] < 5 {
-			gridtemp[i] = 5
-		} else if gridtemp[i] > 67 {
-			gridtemp[i] = 67
+	// from second line on, read grid temp settings data
+	for d := 0; d < 7; d++ {
+		ffScanner.Scan()
+		for i := 0; i < 24; i++ {
+			fmt.Sscan(ffScanner.Text(), &gridtemp[d][i])
+			if gridtemp[d][i] < 5 {
+				gridtemp[d][i] = 5
+			} else if gridtemp[d][i] > 67 {
+				gridtemp[d][i] = 67
+			}
 		}
 	}
 	ff.Close()
@@ -539,6 +547,10 @@ func main() {
 			serbyte = 4 // tell Nucleo to send complete data
 		}
 		//$ ser.Write([]byte{serbyte})
+		if mustanswer {
+			fmt.Println("serbyte=", serbyte)
+			mustanswer = false
+		}
 		/*if hh != hour { // hh is the latest reading, hour is the preceding one
 			// first append line to datafile with last hour's data:
 			ln := fmt.Sprintf("%d %2d %d %d/n", hour+100*day+1e4*int(month)+1e6*year, oldtemp, int(totswh), int(totgwh))
