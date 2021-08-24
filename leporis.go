@@ -272,7 +272,7 @@ func newscreendata(printchan chan<- []byte, year, month, day, hour int64) {
 				if fileScanner.Scan() { // read next line if available and process it
 					_, err = fmt.Sscan(fileScanner.Text(), &tstamp, &swh, &gwh, &deg)
 					if err != nil {
-						fmt.Println("Error parsing logfile:", err)
+						fmt.Println("Error parsing datafile:", err)
 						return
 					}
 				} else {

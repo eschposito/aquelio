@@ -39,16 +39,16 @@ func Serve(defcols byte, greeting []byte) (chan<- []byte, <-chan [2]byte) {
 	for i := 1; i <= 3; i++ {
 		vmem[i] = vmem[0]
 	}
-	axspw, err := ioutil.ReadFile("/home/pi/Documents/aquelio/axspw.txt")
+	axspw, err := ioutil.ReadFile("axspw.txt")
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	}
-	exepw, err := ioutil.ReadFile("/home/pi/Documents/aquelio/exepw.txt")
+	exepw, err := ioutil.ReadFile("exepw.txt")
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	} // end of initialization section
 	http.HandleFunc("/vram~"+string(axspw)+"/", vramHandler)   // can see screen but ignores clicks
-	http.HandleFunc("/vram~"+string(exepw)+"/", vramHandlerRW) // can see screen and process clicks
+	http.HandleFunc("/vram~"+string(axspw)+"!!/", vramHandlerRW) // can see screen and process clicks
 	http.Handle("/priv_"+string(axspw)+"/", http.FileServer(http.Dir("priv")))
 	http.Handle("/priv_"+string(exepw)+"/", http.FileServer(http.Dir("priv")))
 	http.Handle("/verypriv_"+string(exepw)+"/", http.FileServer(http.Dir("verypriv")))

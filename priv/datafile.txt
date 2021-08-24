@@ -1,1 +1,1 @@
-YYYYMMDDHH °C Sun_Wh Grid_Wh
+YYYYMMDDHH  Sun Grid °C
