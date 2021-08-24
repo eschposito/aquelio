@@ -39,11 +39,11 @@ func Serve(defcols byte, greeting []byte) (chan<- []byte, <-chan [2]byte) {
 	for i := 1; i <= 3; i++ {
 		vmem[i] = vmem[0]
 	}
-	axspw, err := ioutil.ReadFile("axspw.txt")
+	axspw, err := ioutil.ReadFile("/home/pi/Documents/aquelio/axspw.txt")
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	}
-	exepw, err := ioutil.ReadFile("exepw.txt")
+	exepw, err := ioutil.ReadFile("/home/pi/Documents/aquelio/exepw.txt")
 	if err != nil {
 		fmt.Println("File read error: ", err)
 	} // end of initialization section

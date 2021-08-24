@@ -54,17 +54,22 @@ func readtempfile() [7][24]byte {
 		fmt.Println("Error opening grid temp settings file:", err)
 		for i := 0; i < 7; i++ {
 			for j := 0; j < 24; j++ {
-				gridt[i][j] = 60 // can't read file: initialize all values to 60°C
+				gridt[i][j] = 5 // can't read file: initialize all values to 5°C
 			}
 		}
-		return gridt // all zero values
+		return gridt
 	}
 	ffScanner.Scan() // read and discard first line
 	ffScanner.Scan() // read and discard second line
 	for linea := 0; linea < 7; linea++ {
 		ffScanner.Scan() // ff lines 3-9 contain grid temp settings Sunday-Monday
+		fmt.Sscan(ffScanner.Text(), &gridt[linea][0], &gridt[linea][1], &gridt[linea][2], &gridt[linea][3],
+			&gridt[linea][4], &gridt[linea][5], &gridt[linea][6], &gridt[linea][7],
+			&gridt[linea][8], &gridt[linea][9], &gridt[linea][10], &gridt[linea][11],
+			&gridt[linea][12], &gridt[linea][13], &gridt[linea][14], &gridt[linea][15],
+			&gridt[linea][16], &gridt[linea][17], &gridt[linea][18], &gridt[linea][19],
+			&gridt[linea][20], &gridt[linea][21], &gridt[linea][22], &gridt[linea][23])
 		for i := 0; i < 24; i++ {
-			fmt.Sscan(ffScanner.Text(), &gridt[linea][i])
 			if gridt[linea][i] < 5 {
 				gridt[linea][i] = 5
 			} else if gridt[linea][i] > 67 {
@@ -113,7 +118,7 @@ func printsetscreen(pchan chan<- []byte, gridt [7][24]byte) {
 	pchan <- []byte("Fri")
 	pchan <- []byte("Sat")
 	for i := 0; i < 7; i++ {
-		for j := 0; j <= 24; j++ {
+		for j := 0; j < 24; j++ {
 			pchan <- []byte(fmt.Sprintf("<%dY %dX>%2d", i+3, j*3+5, gridt[i][j]))
 		}
 	}
@@ -130,7 +135,7 @@ func printsetscreen(pchan chan<- []byte, gridt [7][24]byte) {
 	pchan <- []byte("<19Y 1X $>^^ Usage: select value to change then click keys ^^")
 }
 
-func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool) {
+func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool, degC byte, msg []byte) {
 	///// draws complete screen \\\\\
 	// clear screen:
 	for i := 1; i <= 26; i++ {
@@ -156,10 +161,10 @@ func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool) {
 	pchan <- append([]byte("<13x 12b 1f>--"), 176, 'C')
 	// sun temp setting legend:
 	pchan <- []byte("<12y 2x/>Sun temp")
-	pchan <- []byte("<6x>set:")
+	pchan <- []byte("<2x>set: 77")
 	// grid temp setting legend:
 	pchan <- []byte("<4y 20x 7f/>Grid temp")
-	pchan <- []byte("<20x 7f>set:")
+	pchan <- []byte(fmt.Sprintf("<20x 7f>set: %2d", degC))
 	// water heater drawing:
 	pchan <- append([]byte("<6y 11x 15f/>"), 248, 222, 222, 222, 222, 222, 222, 129)
 	for i := 1; i <= 9; i++ {
@@ -174,36 +179,36 @@ func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool) {
 	pchan <- append([]byte("<9b 15f>"), 210)
 	// right side of screen with black background:
 	pchan <- []byte("<1y>") // top line
-	for i := 1; i <= 23; i++ {
+	for i := 1; i <= 24; i++ {
 		pchan <- []byte("<30x 0b 10f>         :                                         ")
 	}
 	// status line (line 25):
 	pchan <- append([]byte("<25y 1x 0b 10f>"), 202)
 	pchan <- append([]byte("<0b 9f> "), 200)
 	pchan <- append([]byte("<0b 9f>Aquelio"), 200)
-	pchan <- []byte("<0b 10f> Status:        ")
-	pchan <- append([]byte("<0b 4f>"), 31)         // 31: down pointing triangle
-	pchan <- append([]byte("<0b 10f>y-m-d@h"), 30) // 30: up pointing triangle
-	pchan <- append([]byte("<0b 4f> "), 31)
-	pchan <- append([]byte("<0b 10f>*Sun"), 30)
-	pchan <- append([]byte("<0b 4f> "), 31)
-	pchan <- append([]byte("<0b 10f>~Grid"), 30)
-	pchan <- append([]byte("<74x 0b 4f>"), 31)
-	pchan <- append([]byte("<0b 10f>+Temp"), 30)
+	pchan <- []byte("<0b 10f> Status: " + string(msg) + "    ")
+	pchan <- append([]byte("<1b 4f>"), 31)         // 31: down pointing triangle
+	pchan <- append([]byte("<1b 10f>y-m-d@h"), 30) // 30: up pointing triangle
+	pchan <- append([]byte("<1b 4f> "), 31)
+	pchan <- append([]byte("<1b 10f>*Sun"), 30)
+	pchan <- append([]byte("<1b 4f> "), 31)
+	pchan <- append([]byte("<1b 10f>~Grid"), 30)
+	pchan <- append([]byte("<74x 1b 4f>"), 31)
+	pchan <- append([]byte("<1b 10f>+Temp"), 30)
 	if usepv {
 		pchan <- []byte("<25y 39x 14b 10f>*Sun") // [*Sun] backlighting on
 	} else {
-		pchan <- []byte("<25y 39x 0b 14f>*Sun") // [*Sun] backlighting off
+		pchan <- []byte("<25y 39x 1b 14f>*Sun") // [*Sun] backlighting off
 	}
 	if usegrid {
 		pchan <- []byte("<25y 46x 7b 10f>~Grid") // [~Grid] backlighting on
 	} else {
-		pchan <- []byte("<25y 46x 0b 7f>~Grid") // [~Grid] backlighting off
+		pchan <- []byte("<25y 46x 1b 7f>~Grid") // [~Grid] backlighting off
 	}
 	if heatnow {
 		pchan <- []byte("<25y 75x 12b 10f>+Temp") // [+Temp] backlighting on
 	} else {
-		pchan <- []byte("<25y 75x 0b 12f>+Temp") // [+Temp] backlighting off
+		pchan <- []byte("<25y 75x 1b 12f>+Temp") // [+Temp] backlighting off
 	}
 	// bottom kWh readings legend:
 	pchan <- []byte("<19y 1x/>   * kWh:")
@@ -214,8 +219,8 @@ func printscreen(pchan chan<- []byte, usepv, usegrid, heatnow bool) {
 	pchan <- []byte("<$>")
 }
 
-func newscreendata(printchan chan<- []byte, year, month, day, hour int) {
-	// INCOMPLETE: only works for hourly values (if hour >= 1), and does not graph Wh and temp values
+func newscreendata(printchan chan<- []byte, year, month, day, hour int64) {
+	// INCOMPLETE: only works for hourly values (if hour >= 0), and does not graph Wh and temp values
 	// reads data from logfile, then
 	// redraws right side of entire screen except status (last) line
 	file, err := os.Open("priv/datafile.txt")
@@ -225,13 +230,11 @@ func newscreendata(printchan chan<- []byte, year, month, day, hour int) {
 		fmt.Println("Error opening datafile:", err)
 		return
 	}
-	var timestamp, sunwh, gridwh, temp [25]int
-	var tstamp, deg, swh, gwh int // same as above, but read from file line
-	var ln int                    // screen line #: ln=1: 1st line, ln=24: last line before status line
-	if hour > 0 {                 // hourly diagram up to hour, where 1 <= hour <= 24
+	var timestamp, sunwh, gridwh, temp [25]int64
+	var tstamp, deg, swh, gwh int64 // same as above, but read from file line
+	var ln int                      // screen line #: ln=1: 1st line, ln=24: last line before status line
+	if hour >= 0 {                  // hourly diagram up to hour, where 0 <= hour <= 24
 		for ln = 24; ln >= 0; ln-- {
-			timestamp[ln] = hour + 100*day + 10000*month + 1000000*year // => yyyymmddhh
-			hour--
 			if hour == 0 {
 				hour = 24
 				day--
@@ -255,6 +258,8 @@ func newscreendata(printchan chan<- []byte, year, month, day, hour int) {
 					}
 				}
 			}
+			timestamp[ln] = hour + 100*day + 10000*month + 1000000*year // => yyyymmddhh
+			hour--
 		}
 		_ = fileScanner.Scan() // read and discard first line with headers
 		for ln = 1; ln < 25; ln++ {
@@ -278,7 +283,7 @@ func newscreendata(printchan chan<- []byte, year, month, day, hour int) {
 		for ln = 1; ln < 25; ln++ { // now print to screen lines 1 to 24
 			t := fmt.Sprint(timestamp[ln])
 			tstr := t[:4] + "-" + t[4:6] + "-" + t[6:8] + " " + t[8:]
-			lntxt := fmt.Sprintf("<31x %dy>%s: *%4d ~%4d Wh, %2d°C", ln, tstr, sunwh[ln], gridwh[ln], temp[ln])
+			lntxt := fmt.Sprintf("<31x %dy b>%s: *%4d ~%4d Wh, %2d°C", ln, tstr, sunwh[ln], gridwh[ln], temp[ln])
 			printchan <- []byte(lntxt)
 		}
 		// finally, display all:
@@ -300,38 +305,38 @@ func main() {
 	if err != nil {
 		fmt.Println("Serial opening error:", err)
 	}
-	usepv := true    // enable use of PV
-	usegrid := true  // enable use of grid
-	heatnow := false // true if manual heating [+°C] was requested
-	printscreen(printchan, usepv, usegrid, heatnow)
+	usepv := true            // enable use of PV
+	usegrid := true          // enable use of grid
+	heatnow := false         // true if manual heating [+°C] was requested
 	buf := make([]byte, 320) // buffer of chars read from Nucleo
 	const Rpv = 9.6          // ohm rating of PV heater resistor
 	const Rgrid = 35.5       // ohm rating of grid heater resistor
-	const startyear = 2020   // means startyear <= yyyy <= startyear+99
-	var timest int = (startyear + 200) * 1000000
+	const startyear = 1970   // means startyear <= yyyy <= startyear+99
+	var timest int64 = (startyear + 200) * 1000000
 	// timest: date & time combination from Nucleo RTC, here initialized with a higher value
-	var vpv, vgrid float64               // PV and grid voltage readings from Nucleo
-	var temp int                         // water temperature reading from Nucleo
-	var yyyy, yy, mo, dd, hh, mi int     // date & time read from Nucleo RTC
-	var oldyyyy, oldmo, olddd, oldhh int // old values from previous iteration
-	var sunwatt, gridwatt float64        // instant power from sun and grid
-	var hswh, hgwh float64               // hourly energy (Wh) from sun and grid
-	var dswh, dgwh float64               // daily energy (Wh) from sun and grid
-	var mswh, mgwh float64               // monthly energy (Wh) from sun and grid
-	var yswh, ygwh float64               // yearly energy (Wh) from sun and grid
-	var totswh, totgwh float64           // total energy (Wh) from sun and grid
-	var pvheating, gridheating bool      // PV and grid heating actual on/off status
-	var stusepv, stusegrid bool          // Nucleo settings for usepv and usegrid
-	var stgridtemp byte                  // set temp (5..67°C) for grid heating and Nucleo setting
-	var getmoreinfo bool                 // if true, reads and displays more info from Nucleo
-	var msgstr []byte                    // 3 char status/message from Nucleo
-	var screentime int                   // time counter for settings screen
-	var numsel byte                      // number of °C to add to selected temperature setting
-	var xsel, ysel byte                  // coordinates of selected character in settings screen
-	var hsel byte                        // selected hour index in settings screen
-	var gridtemp [7][24]byte             // hourly table of grid temp settings (5..67°C), now initialize them:
+	var vpv, vgrid float64                 // PV and grid voltage readings from Nucleo
+	var temp, wd int                       // water temperature reading from Nucleo and weekday
+	var yyyy, yy, mo, dd, hh, mi int64     // date & time read from Nucleo RTC
+	var oldyyyy, oldmo, olddd, oldhh int64 // old values from previous iteration
+	var sunwatt, gridwatt float64          // instant power from sun and grid
+	var hswh, hgwh float64                 // hourly energy (Wh) from sun and grid
+	var dswh, dgwh float64                 // daily energy (Wh) from sun and grid
+	var mswh, mgwh float64                 // monthly energy (Wh) from sun and grid
+	var yswh, ygwh float64                 // yearly energy (Wh) from sun and grid
+	var totswh, totgwh float64             // total energy (Wh) from sun and grid
+	var pvheating, gridheating bool        // PV and grid heating actual on/off status
+	var stusepv, stusegrid bool            // Nucleo settings for usepv and usegrid
+	var stgridtemp byte                    // set temp (5..67°C) for grid heating and Nucleo setting
+	var getmoreinfo bool                   // if true, reads and displays more info from Nucleo
+	var msgstr []byte                      // 3 char status/message from Nucleo
+	var screentime int                     // time counter for settings screen
+	var numsel byte                        // number of °C to add to selected temperature setting
+	var xsel, ysel byte                    // coordinates of selected character in settings screen
+	var hsel byte                          // selected hour index in settings screen
+	var gridtemp [7][24]byte               // hourly table of grid temp settings (5..67°C), now initialize them:
 	gridtemp = readtempfile()
 	newgridtemp := gridtemp // new values of grid temps, not yet saved
+	printscreen(printchan, usepv, usegrid, heatnow, 0, []byte("---"))
 	type ScreenType int
 	const (
 		NormalScreen ScreenType = iota
@@ -348,7 +353,7 @@ func main() {
 		var clickserbyte byte               // (set to 0) byte to be transmitted due to user clicking in settings screen
 		switch screen {
 		case SettingsScreen:
-			printchan <- []byte(fmt.Sprintf("<B 11Y 17X $>%4d-%2d-%2d %2d:%2d", yyyy, mo, dd, hh, mi)) // print date&time at each iteration
+			printchan <- []byte(fmt.Sprintf("<B 11Y 17X $>%4d-%02d-%02d %2d:%02d", yyyy, mo, dd, hh, mi)) // print date&time at each iteration
 			select {
 			case cp := <-clickchan: // receive click position coordinates y,x
 				yclick, xclick = cp[0], cp[1]
@@ -445,12 +450,12 @@ func main() {
 					case 17, 18, 19, 20: // exit and save
 						gridtemp = newgridtemp
 						writetempfile(gridtemp)
-						printscreen(printchan, usepv, usegrid, heatnow)          // redraw entire screen
-						newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1) // add screen data
+						printscreen(printchan, usepv, usegrid, heatnow, gridtemp[wd][hh], msgstr) // redraw entire screen
+						newscreendata(printchan, yyyy, mo, dd, hh)                                // add screen data
 						screen = NormalScreen
 					case 25, 26, 27, 28: // exit without saving
-						printscreen(printchan, usepv, usegrid, heatnow)          // redraw entire screen
-						newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1) // add screen data
+						printscreen(printchan, usepv, usegrid, heatnow, gridtemp[wd][hh], msgstr) // redraw entire screen
+						newscreendata(printchan, yyyy, mo, dd, hh)                                // add screen data
 						screen = NormalScreen
 					case 37, 38, 39, 40: // quit
 						fmt.Println("EXITING FROM APPLICATION...")
@@ -464,8 +469,8 @@ func main() {
 				}
 			default: // no clicks for a long time: go back to normal screen
 				if screentime > 150 {
-					printscreen(printchan, usepv, usegrid, heatnow)          // redraw entire screen
-					newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1) // add screen data
+					printscreen(printchan, usepv, usegrid, heatnow, gridtemp[wd][hh], msgstr) // redraw entire screen
+					newscreendata(printchan, yyyy, mo, dd, hh)                                // add screen data
 					screen = NormalScreen
 					screentime = 0
 				} else {
@@ -486,7 +491,8 @@ func main() {
 							screen = SettingsScreen
 						case 3: // clicked on water icon preceding Aquelio
 							getmoreinfo = false
-							printscreen(printchan, usepv, usegrid, heatnow) // redraw entire screen
+							printscreen(printchan, usepv, usegrid, heatnow, gridtemp[wd][hh], msgstr) // redraw entire screen
+							newscreendata(printchan, yyyy, mo, dd, hh)                                // add screen data
 						case 9: // clicked on letter i of Aquelio
 							getmoreinfo = true
 							printchan <- []byte("<25y 9x 9b 9f>i") // flash 'i'
@@ -498,19 +504,19 @@ func main() {
 						case 36: // time up icon
 						case 38: // *Sun stop icon
 							usepv = false
-							printchan <- []byte("<25y 39x 0b 14f>*Sun") // [*Sun] backlighting off
+							printchan <- []byte("<25y 39x 1b 14f>*Sun") // [*Sun] backlighting off
 						case 43: // *Sun start icon
 							usepv = true
 							printchan <- []byte("<25y 39x 14b 10f>*Sun") // [*Sun] backlighting on
 						case 45: // ~Grid stop icon
 							usegrid = false
-							printchan <- []byte("<25y 46x 0b 7f>~Grid") // [~Grid] backlighting off
+							printchan <- []byte("<25y 46x 1b 7f>~Grid") // [~Grid] backlighting off
 						case 51: // ~Grid start icon
 							usegrid = true
 							printchan <- []byte("<25y 46x 7b 10f>~Grid") // [~Grid] backlighting on
 						case 74: // +Temp stop icon
 							heatnow = false
-							printchan <- []byte("<25y 75x 0b 12f>+Temp") // [+Temp] backlighting off
+							printchan <- []byte("<25y 75x 1b 12f>+Temp") // [+Temp] backlighting off
 						case 80: // +Temp start icon
 							heatnow = true
 							printchan <- []byte("<25y 75x 12b 10f>+Temp") // [+Temp] backlighting on
@@ -551,6 +557,11 @@ func main() {
 		err = nil
 		rec := buf[bytesread-16 : bytesread]    // get last 16 char
 		rtc := buf[bytesread-25 : bytesread-16] // date & time info
+		for i := 0; i < 9; i++ {                // replace spaces with 0's
+			if rtc[i] == byte(' ') {
+				rtc[i] = byte('0')
+			}
+		}
 		switch rec[0] {
 		case byte('s'):
 			pvheating = false
@@ -587,17 +598,6 @@ func main() {
 		if err != nil {
 			temp = 99
 		}
-		if getmoreinfo {
-			printchan <- []byte("<1y 30x>")
-			printchan <- []byte(string(rec[1:5]))
-			printchan <- []byte(fmt.Sprintf("<1y 40x>%4.0f V; parambyte= %d", vpv, rec[10]))
-			printchan <- []byte("<2y 30x>")
-			printchan <- []byte(string(rec[11:13]))
-			printchan <- []byte(fmt.Sprintf("<2y 40x>%d degC", temp))
-			printchan <- []byte("<3y 30x>")
-			printchan <- []byte(string(rec[6:10]))
-			printchan <- []byte(fmt.Sprintf("<3y 40x>%4.0f Vca", vgrid))
-		}
 		msgstr = rec[13:]
 		if string(msgstr) != "OK@" {
 			// "OK@" is the usual value for msgstr
@@ -605,18 +605,20 @@ func main() {
 		}
 		_, err = fmt.Sscanf(string(rtc), "%2d%1x%2d%2d%2d", &yy, &mo, &dd, &hh, &mi)
 		if err == nil {
-			yyyy = startyear/100 + yy
+			yyyy = (startyear/100)*100 + yy
 			if yyyy < startyear {
 				yyyy += 100
 			}
 		}
 		newtimest := 1000000*yyyy + 10000*mo + 100*dd + hh // updated value of timest
-		datestr := fmt.Sprint("%d/%d/%d", dd, mo, yyyy)
+		datestr := fmt.Sprintf("%d/%d/%d", dd, mo, yyyy)
 		d, err := time.Parse("2/1/2006", datestr)
 		if err != nil {
 			fmt.Println("Error parsing date:", err)
+			fmt.Println("rtc= ", string(rtc))
+			fmt.Println("rec= ", string(rec))
 		}
-		weekday := d.Weekday() // weekday corresponding to RTC time read from Nucleo
+		wd = int(d.Weekday()) // weekday corresponding to RTC time read from Nucleo
 		if pvheating {
 			sunwatt = vpv * vpv / Rpv
 			deltasunwh = sunwatt * dt
@@ -661,8 +663,8 @@ func main() {
 				if usegrid {
 					serbyte++
 				}
-			} else if stgridtemp != gridtemp[weekday][hh] {
-				serbyte = gridtemp[weekday][hh]
+			} else if stgridtemp != gridtemp[wd][hh] {
+				serbyte = gridtemp[wd][hh]
 			} else {
 				serbyte = 200 // everything OK, nothing to communicate
 			}
@@ -673,37 +675,36 @@ func main() {
 		if clickserbyte != 0 { // give priority to clickserbyte, if present
 			ser.Write([]byte{clickserbyte})
 		} else {
-			ser.Write([]byte{serbyte})
+			ser.Write([]byte{serbyte}) // send to Nucleo
 		}
-
 		////////// CHECK IF HOUR HAS CHANGED, LOG AND PRINT TO SCREEN: \\\\\\\\\\\\
 		if newtimest > timest { // hour has changed (and this is not the first iteration)
 			// first append line to datafile with last hour's data:
-			ln := fmt.Sprintf("%d %4d %4d %2d/n", timest+1, int(hswh), int(hgwh), temp) //+1 so hour 0-23 becomes 1-24
+			ln := fmt.Sprintf("%d %4d %4d %2d\n", timest+1, int(hswh), int(hgwh), temp) //+1 so hour 0-23 becomes 1-24
 			appendStringToFile("priv/datafile.txt", ln)
 			if screen == NormalScreen { // update screen data unless settings screen is displayed
 				newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1)
 			}
-			timest = newtimest
-			oldhh = hh
 			hswh = 0
 			hgwh = 0
 			if dd != olddd {
-				olddd = dd
 				dswh = 0
 				dgwh = 0
 				if mo != oldmo {
-					oldmo = mo
 					mswh = 0
 					mgwh = 0
 					if yyyy != oldyyyy {
-						oldyyyy = yyyy
 						yswh = 0
 						ygwh = 0
 					}
 				}
 			}
 		}
+		timest = newtimest // update all time variables
+		oldhh = hh
+		olddd = dd
+		oldmo = mo
+		oldyyyy = yyyy
 		if screen == NormalScreen { // print data to screen:
 			if pvheating {
 				printchan <- []byte(fmt.Sprintf("<2y 10x 14b 1f>%4.0fW", sunwatt))
@@ -717,31 +718,6 @@ func main() {
 			}
 			// with last print request, show all:
 			printchan <- []byte(fmt.Sprintf("<5y 13x 12b 1f $>%2d", temp))
-		} /*
-			// print lines 24 and 25; first build line 24:
-			ln24 := fmt.Sprintf("%d%d: *%4d ~%4d Wh ", hour/10, hour%10, int(hswh), int(hgwh))
-			x := 20 // cursor pos in line
-			for ; x <= temp; x++ {
-				if x > 77 {
-					break
-				}
-				ln24 += "="
-			}
-			for ; x <= 77; x++ {
-				ln24 += " "
-			}
-			if temp == 0 { // temp of 0°C means it was not recorded
-				ln24 += "   "
-			} else {
-				ln24 += fmt.Sprintf("%2d°", temp)
-			}
-			// now build line 25:
-			ts := fmt.Sprint(hour + 100*day + 1e4*int(month) + 1e6*year)
-			tstring := ts[:4] + "-" + ts[4:6] + "-" + ts[6:8] + " " + ts[8:]
-			ln25 := fmt.Sprintf("%s:%d%d *%4d ~%4d W =Aquelio= [D]:*%7d ~%7dkWh[*][~][+°C]|^^=", tstring, minute/10, minute%10, int(sunwatt), int(gridwatt), int(dswh), int(dgwh))
-			// finally print:
-			printchan <- []byte("<24y 1x>" + ln24)
-			printchan <- []byte("<0b 2f $>" + ln25)*/
-
+		}
 	} // end of infinite loop
 }
