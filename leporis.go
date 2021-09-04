@@ -683,7 +683,8 @@ func main() {
 			ln := fmt.Sprintf("%d %4d %4d %2d\n", timest+1, int(hswh), int(hgwh), temp) //+1 so hour 0-23 becomes 1-24
 			appendStringToFile("priv/datafile.txt", ln)
 			if screen == NormalScreen { // update screen data unless settings screen is displayed
-				newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1)
+				printscreen(printchan, usepv, usegrid, heatnow, gridtemp[wd][hh], msgstr) // redraw entire screen
+				newscreendata(printchan, oldyyyy, oldmo, olddd, oldhh+1)                  // add screen data
 			}
 			hswh = 0
 			hgwh = 0
