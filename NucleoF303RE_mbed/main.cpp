@@ -51,6 +51,15 @@ void turnPVoff(bool nogrid) // PV turn off sequence
     }
 }
 
+void turnGRIDon() // grid heating element turn on sequence
+{
+    kx_hi= 1;
+    wait(0.5);
+    k1on= 1;
+    wait(0.5);
+    kx_hi= 0;
+}
+
 int main()
 {
     // initialization section:
@@ -65,7 +74,26 @@ int main()
     unsigned int lastk1on= 0, lastk2on= 0;
     unsigned int lowvpvcount= 0, vgridnogoodcount= 0;
     unsigned int butpresscount= 0;
-    // infinite loop with cycle counter (count):
+    // only right after startup, user can connect to USB serial and adjust real time clock:
+    for(int i=0; i<16; i++) { // 15 seconds loop to DECREASE RTC
+        time_t unixsecs = time(NULL); // seconds since January 1st 1970
+        struct tm* ct = localtime(&unixsecs); // pointer to date & time tm struct
+        pc.printf("RTC time %d:%d:%d. Press user button to DECREASE in steps of 30 secs\r\n",
+                    ct->tm_hour, ct->tm_min, ct->tm_sec);
+        wait(1);
+        if (but == 0) set_time(unixsecs-30);
+    }
+    pc.printf("---PAUSE---\r\n");
+    wait(2);
+    for(int i=0; i<16; i++) { // 15 seconds loop to INCREASE RTC
+        time_t unixsecs = time(NULL); // seconds since January 1st 1970
+        struct tm* ct = localtime(&unixsecs); // pointer to date & time tm struct
+        pc.printf("RTC time %d:%d:%d. Press user button to INCREASE in steps of 30 secs\r\n",
+                    ct->tm_hour, ct->tm_min, ct->tm_sec);
+        wait(1);
+        if (but == 0) set_time(unixsecs+30);
+    }  
+    //////////////// infinite loop with cycle counter (count):
     for(unsigned int count=0; true; count++) {
         {   // this block calculates vpv, vpvmin, vpvmax, lowvpvcount
             vpvmin= 1000;
@@ -290,7 +318,7 @@ int main()
                 if ((wtemp<Tmin) && (oldwtemp<Tmin) && (veryoldwtemp<Tmin)
                     && (count-lastk1on > 100)
                     && !vgriderr && !thswitcherr && (vLswitch>4))
-                    k1on= 1; // turn on grid heating relay
+                    turnGRIDon(); // turn on grid heating relay
             }
         } else if (k1on) k1on= 0; // turn off grid heating relay
     } // end of infinite loop
